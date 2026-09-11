@@ -2,20 +2,17 @@ package com.example.payment_processor.REST;
 
 import com.example.payment_processor.Data.Customer;
 import com.example.payment_processor.Data.Repository.CustomerRepository;
+import com.example.payment_processor.Service.CustomerService;
+import com.example.payment_processor.Utility.Exception.IllegalActionException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-@RestController("/customer")
+@RestController
+@RequestMapping("/api/customer")
 public class CustomerController {
     @Autowired
-    CustomerRepository customerRepository;
+    CustomerService customerService;
 
-    @GetMapping("/create")
-    public ResponseEntity<Customer> createCustomer(@RequestBody Customer customer) {
-        customerRepository.save(customer);
-        return ResponseEntity.ok(customer);
-    }
+
 }

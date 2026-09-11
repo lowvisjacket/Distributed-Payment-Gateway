@@ -69,7 +69,7 @@ public class PaymentService {
                 .orElseThrow(() -> new IllegalActionException("Customer not found for id: " + customerId));
         Business business = businessRepository.findById(businessId)
                 .orElseThrow(() -> new IllegalActionException("Business not found for id: " + businessId));
-        Wallet wallet = walletRepository.findByCustomerIdForUpdate(customerId)
+        Wallet wallet = walletRepository.findByCustomer_IdForUpdate(customerId)
                 .orElseThrow(() -> new IllegalActionException("Customer wallet not found for id: " + customerId));
 
         if (wallet.getBalance().compareTo(amount) < 0) {
