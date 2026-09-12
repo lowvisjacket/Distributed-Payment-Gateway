@@ -49,5 +49,6 @@ public class Customer {
         this.id = UUID.randomUUID();
         this.wallet = new Wallet(Currency.getInstance("USD"), this);
         this.business = null;
+        this.accountStatus = false;
     }
 }

@@ -2,6 +2,7 @@ package com.example.payment_processor.Service;
 
 import com.example.payment_processor.Data.Customer;
 import com.example.payment_processor.Data.Repository.CustomerRepository;
+import com.example.payment_processor.Security.Email.VerificationCodeService;
 import com.example.payment_processor.Utility.Exception.IllegalActionException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -18,6 +19,7 @@ import java.util.UUID;
 public class CustomerService implements UserDetailsService {
     private final CustomerRepository customerRepository;
     private final BCryptPasswordEncoder bCryptPasswordEncoder;
+    private final VerificationCodeService verificationCodeService;
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
@@ -27,6 +29,7 @@ public class CustomerService implements UserDetailsService {
         return User.withUsername(customer.getEmail())
                 .password(customer.getPassword())
                 .roles(customer.getCustomerRole().name())
+                .disabled(!customer.isAccountStatus())
                 .build();
     }
 
@@ -58,6 +61,7 @@ public class CustomerService implements UserDetailsService {
         }
 
         Customer customer = new Customer(firstName.trim(), lastName.trim(), normalizedEmail, normalizedPhoneNumber, bCryptPasswordEncoder.encode(password));
+        verificationCodeService.sendRegistrationCode(customer.getEmail());
         return customerRepository.save(customer);
     }
 
@@ -76,5 +80,11 @@ public class CustomerService implements UserDetailsService {
         }
         return customerRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalActionException("Customer not found for email: " + email));
+    }
+
+    public void verifyCustomerEmail(String email) throws IllegalActionException {
+        Customer customer = getCustomerByEmail(email);
+        customer.setAccountStatus(true);
+        customerRepository.save(customer);
     }
 }
