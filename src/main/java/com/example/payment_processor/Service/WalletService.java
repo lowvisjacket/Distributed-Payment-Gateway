@@ -31,6 +31,14 @@ public class WalletService {
 
     public Wallet updateWallet(Currency currency, String email) throws IllegalActionException {
         Wallet oldWallet = getWalletByEmail(email);
+        return updateWallet(oldWallet, currency);
+    }
+
+    public Wallet updateWallet(Currency currency, UUID customerId) throws IllegalActionException {
+        return updateWallet(getWalletByCustomerId(customerId), currency);
+    }
+
+    private Wallet updateWallet(Wallet oldWallet, Currency currency) throws IllegalActionException {
         validateCurrency(String.valueOf(currency));
         oldWallet.setCurrency(currency);
         walletRepository.save(oldWallet);
