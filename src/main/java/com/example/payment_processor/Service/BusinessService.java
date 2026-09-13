@@ -39,4 +39,13 @@ public class BusinessService {
         return businessRepository.findById(businessId)
                 .orElseThrow(() -> new IllegalActionException("Business not found for id: " + businessId));
     }
+
+    public Business getBusinessByCustomerId(UUID customerId) throws IllegalActionException {
+        if (customerId == null) {
+            throw new IllegalActionException("Customer id is required.");
+        }
+
+        return businessRepository.findByCustomerId(customerId)
+                .orElseThrow(() -> new IllegalActionException("Business not found for customer id: " + customerId));
+    }
 }

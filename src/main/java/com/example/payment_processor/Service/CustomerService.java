@@ -3,6 +3,7 @@ package com.example.payment_processor.Service;
 import com.example.payment_processor.Data.Customer;
 import com.example.payment_processor.Data.Repository.CustomerRepository;
 import com.example.payment_processor.Security.Email.VerificationCodeService;
+import com.example.payment_processor.Security.AuthenticatedCustomer;
 import com.example.payment_processor.Utility.Exception.IllegalActionException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -25,12 +26,22 @@ public class CustomerService implements UserDetailsService {
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         Customer customer = customerRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("Customer not found: " + email));
+        return toUserDetails(customer);
+    }
 
-        return User.withUsername(customer.getEmail())
+    public UserDetails loadUserById(UUID customerId) throws UsernameNotFoundException {
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new UsernameNotFoundException("Customer not found: " + customerId));
+        return toUserDetails(customer);
+    }
+
+    private UserDetails toUserDetails(Customer customer) {
+        UserDetails userDetails = User.withUsername(customer.getEmail())
                 .password(customer.getPassword())
                 .roles(customer.getCustomerRole().name())
                 .disabled(!customer.isAccountStatus())
                 .build();
+        return new AuthenticatedCustomer(customer.getId(), userDetails);
     }
 
     public Customer createCustomer(String firstName, String lastName, String email, String phoneNumber, String password) throws IllegalActionException {
