@@ -1,5 +1,6 @@
 package com.example.payment_processor.Security.Jwt;
 
+import com.example.payment_processor.Service.CustomerService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -8,21 +9,20 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.UUID;
 
 @Component
 public class JwtFilter extends OncePerRequestFilter {
-    private final UserDetailsService userDetailsService;
+    private final CustomerService customerService;
     private final JwtService jwtService;
     @Autowired
-    public JwtFilter(UserDetailsService userDetailsService, JwtService jwtService) {
-        this.userDetailsService = userDetailsService;
+    public JwtFilter(CustomerService customerService, JwtService jwtService) {
+        this.customerService = customerService;
         this.jwtService = jwtService;
     }
 
@@ -30,15 +30,15 @@ public class JwtFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         String authHeader = request.getHeader("Authorization");
         String token = null;
-        String email = null;
+        UUID customerId = null;
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             token = authHeader.substring(7);
-            email = jwtService.extractEmail(token);
+            customerId = jwtService.extractCustomerId(token);
         }
 
-        if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-            if (userDetails.isEnabled() && jwtService.validateToken(token, userDetails)) {
+        if (customerId != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            UserDetails userDetails = customerService.loadUserById(customerId);
+            if (userDetails.isEnabled() && jwtService.validateToken(token, customerId, userDetails)) {
                 UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken = new UsernamePasswordAuthenticationToken(
                         userDetails,
                         null,

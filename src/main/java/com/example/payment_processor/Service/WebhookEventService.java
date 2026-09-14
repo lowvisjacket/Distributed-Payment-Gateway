@@ -8,6 +8,7 @@ import com.example.payment_processor.Data.WebhookSubscription;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,12 +23,19 @@ import java.util.HexFormat;
 import java.util.Map;
 
 @Service
-@RequiredArgsConstructor
+
 public class WebhookEventService {
     private final WebhookEventRepository eventRepository;
     private final WebhookSubscriptionRepository subscriptionRepository;
     private final ObjectMapper objectMapper;
     private final RestClient restClient = RestClient.create();
+
+    @Autowired
+    public WebhookEventService(WebhookEventRepository eventRepository, WebhookSubscriptionRepository subscriptionRepository, ObjectMapper objectMapper) {
+        this.eventRepository = eventRepository;
+        this.subscriptionRepository = subscriptionRepository;
+        this.objectMapper = objectMapper;
+    }
 
     @Transactional
     public void recordPaymentEvent(Payment payment, String eventType) {

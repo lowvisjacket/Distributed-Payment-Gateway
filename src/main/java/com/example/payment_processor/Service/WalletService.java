@@ -191,6 +191,10 @@ public class WalletService {
         Wallet sourceWallet = firstWallet.getId().equals(source.getId()) ? firstWallet : secondWallet;
         Wallet targetWallet = firstWallet.getId().equals(target.getId()) ? firstWallet : secondWallet;
 
+        if (!sourceWallet.getCurrency().equals(targetWallet.getCurrency())) {
+            throw new IllegalActionException("Transfers require wallets with the same currency.");
+        }
+
         if (sourceWallet.getBalance().compareTo(amount) < 0) {
             throw new BalanceException("Insufficient funds for transfer.");
         }

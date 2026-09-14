@@ -12,20 +12,21 @@ import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 @Component
 public class JwtService {
     @Value("${jwt.secret}")
     private String SECRET;
-    public String generateToken(String email) {
+    public String generateToken(UUID customerId) {
         Map<String, Object> claims = new HashMap<>();
-        return createToken(claims, email);
+        return createToken(claims, customerId);
     }
 
-    private String createToken(Map<String, Object> claims, String email) {
+    private String createToken(Map<String, Object> claims, UUID customerId) {
         return Jwts.builder()
                 .claims(claims)
-                .subject(email)
+                .subject(customerId.toString())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 30))
                 .signWith(getSignInKey())
@@ -37,8 +38,8 @@ public class JwtService {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public String extractEmail(String token) {
-        return extractClaims(token, Claims::getSubject);
+    public UUID extractCustomerId(String token) {
+        return UUID.fromString(extractClaims(token, Claims::getSubject));
     }
 
     public Date extractExpiration(String token) {
@@ -63,10 +64,10 @@ public class JwtService {
         return expiration.before(new Date());
     }
 
-    public boolean validateToken(String token, UserDetails userDetails) {
-        final String email =  extractEmail(token);
+    public boolean validateToken(String token, UUID customerId, UserDetails userDetails) {
+        final UUID tokenCustomerId = extractCustomerId(token);
         return (userDetails.isEnabled()
-                && email.equals(userDetails.getUsername())
+                && tokenCustomerId.equals(customerId)
                 && !isTokenExpired(token));
     }
 }
