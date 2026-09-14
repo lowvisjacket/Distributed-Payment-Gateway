@@ -22,6 +22,7 @@ public class Payment {
     private final BigDecimal amount;
     private final Instant paymentDate;
     private final Instant paymentTime;
+    private Instant timeMade;
     @Enumerated(EnumType.STRING)
     private PaymentStatus paymentStatus;
 
@@ -31,6 +32,7 @@ public class Payment {
         this.amount = amount;
         this.paymentDate = paymentDate;
         this.paymentTime = paymentTime;
+        this.timeMade = Instant.now();
         this.paymentStatus = PaymentStatus.PENDING;
     }
 
@@ -41,5 +43,6 @@ public class Payment {
         this.amount = null;
         this.paymentDate = null;
         this.paymentTime = null;
+        this.timeMade = null;
     }
 }

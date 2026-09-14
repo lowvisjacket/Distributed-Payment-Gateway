@@ -32,6 +32,7 @@ public class PaymentService {
     private final BusinessRepository businessRepository;
     private final WalletRepository walletRepository;
     private final PaymentIdempotencyRepository paymentIdempotencyRepository;
+    private final WebhookEventService webhookEventService;
 
     @Transactional
     public Payment createPayment(UUID customerId, UUID businessId, BigDecimal amount, String idempotencyKey)
@@ -80,10 +81,10 @@ public class PaymentService {
         wallet.setUpdatedAt(Instant.now());
 
         Payment payment = new Payment(customerId, businessId, amount, Instant.now(), Instant.now());
-        payment.setPaymentStatus(PaymentStatus.SUCCESSFUL);
 
         walletRepository.save(wallet);
         Payment savedPayment = paymentRepository.saveAndFlush(payment);
+        webhookEventService.recordPaymentEvent(savedPayment, "payment.pending");
         idempotency.setPaymentId(savedPayment.getId());
         paymentIdempotencyRepository.save(idempotency);
         return savedPayment;
