@@ -22,11 +22,16 @@ public class PaymentSettlementService {
     @Scheduled(cron = "0 0 0 * * *", zone = "${payment.settlement-zone:UTC}")
     @Transactional
     public void settlePendingPayments() {
-        paymentRepository.findByPaymentStatus(PaymentStatus.PENDING)
+        paymentRepository.findIdsByPaymentStatus(PaymentStatus.PENDING)
                 .forEach(this::settlePayment);
     }
 
-    private void settlePayment(Payment payment) {
+    private void settlePayment(Long paymentId) {
+        Payment payment = paymentRepository.findByIdForUpdate(paymentId).orElse(null);
+        if (payment == null || payment.getPaymentStatus() != PaymentStatus.PENDING) {
+            return;
+        }
+
         Wallet businessWallet = walletRepository.findByBusiness_IdForUpdate(payment.getBusinessId())
                 .orElse(null);
 
