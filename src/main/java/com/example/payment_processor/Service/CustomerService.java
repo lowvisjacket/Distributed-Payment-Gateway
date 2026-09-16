@@ -45,7 +45,7 @@ public class CustomerService implements UserDetailsService {
         return new AuthenticatedCustomer(customer.getId(), userDetails, verificationCodeService);
     }
 
-    public Customer createCustomer(String firstName, String lastName, String email, String phoneNumber, String password) throws IllegalActionException {
+    public void createCustomer(String firstName, String lastName, String email, String phoneNumber, String password) throws IllegalActionException {
         if (firstName == null || firstName.isBlank()) {
             throw new IllegalActionException("Customer first name is required.");
         }
@@ -74,7 +74,7 @@ public class CustomerService implements UserDetailsService {
 
         Customer customer = new Customer(firstName.trim(), lastName.trim(), normalizedEmail, normalizedPhoneNumber, bCryptPasswordEncoder.encode(password));
         verificationCodeService.sendRegistrationCode(customer.getEmail());
-        return customerRepository.save(customer);
+        customerRepository.save(customer);
     }
 
     public Customer getCustomerById(UUID customerId) throws IllegalActionException {

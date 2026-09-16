@@ -108,7 +108,7 @@ public class WalletService {
                 .orElseThrow(() -> new IllegalActionException("Wallet not found for customer id: " + customerId));
     }
 
-    public Wallet getWalletByEmail(String email) throws IllegalActionException {
+    public void getWalletByEmail(String email) throws IllegalActionException {
         if (email == null || email.isBlank()) {
             throw new IllegalActionException("Customer email is required.");
         }
@@ -116,7 +116,7 @@ public class WalletService {
         Customer customer = customerRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalActionException("Customer not found for email: " + email));
         isWalletDisabled(customer.getId());
-        return getWalletByCustomerId(customer.getId());
+        getWalletByCustomerId(customer.getId());
     }
 
     @Transactional
