@@ -210,7 +210,8 @@ class SecurityAndVerificationTests {
     void walletControllerUsesAuthenticatedCustomerId() throws Exception {
         com.example.payment_processor.Service.WalletService walletService =
                 mock(com.example.payment_processor.Service.WalletService.class);
-        WalletController controller = new WalletController(walletService);
+        com.example.payment_processor.Service.DepositService depositService = mock(com.example.payment_processor.Service.DepositService.class);
+        WalletController controller = new WalletController(walletService, depositService);
         UUID customerId = UUID.randomUUID();
         AuthenticatedCustomer principal = authenticatedCustomer(customerId);
 
