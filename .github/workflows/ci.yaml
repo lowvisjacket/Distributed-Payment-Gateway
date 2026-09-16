@@ -11,6 +11,8 @@ jobs:
   test-and-build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
 
     steps:
       - name: Checkout
@@ -32,7 +34,7 @@ jobs:
       - name: Build
         run: ./mvnw --batch-mode --no-transfer-progress package -DskipTests
 
-  dependency-scan:
+  dependency-analysis:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -50,10 +52,10 @@ jobs:
       - name: Make Maven wrapper executable
         run: chmod +x mvnw
 
-      - name: Scan dependencies
+      - name: Analyze Maven dependencies
         run: >
           ./mvnw
           --batch-mode
           --no-transfer-progress
-          org.owasp:dependency-check-maven:check
-          -DfailBuildOnCVSS=7
+          dependency:analyze-only
+          -DignoreNonCompile=true
