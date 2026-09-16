@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.UUID;
@@ -39,21 +41,37 @@ public class WebhookSubscriptionService {
         return subscriptionRepository.save(subscription);
     }
 
-    private void validateUrl(String url) throws IllegalActionException {
+    public static void validateUrl(String url) throws IllegalActionException {
         if (url == null || url.isBlank()) {
             throw new IllegalActionException("Webhook URL is required.");
         }
         try {
             URI parsed = URI.create(url.trim());
-            if (!"https".equalsIgnoreCase(parsed.getScheme())
-                    && !"http".equalsIgnoreCase(parsed.getScheme())) {
-                throw new IllegalActionException("Webhook URL must use HTTP or HTTPS.");
+            if (!"https".equalsIgnoreCase(parsed.getScheme())) {
+                throw new IllegalActionException("Webhook URL must use HTTPS.");
             }
-            if (parsed.getHost() == null) {
+            if (parsed.getHost() == null || parsed.getUserInfo() != null) {
                 throw new IllegalActionException("Webhook URL must include a host.");
             }
+            rejectPrivateAddress(parsed.getHost());
         } catch (IllegalArgumentException exception) {
             throw new IllegalActionException("Webhook URL is invalid.");
+        }
+    }
+
+    private static void rejectPrivateAddress(String host) throws IllegalActionException {
+        try {
+            for (InetAddress address : InetAddress.getAllByName(host)) {
+                if (address.isAnyLocalAddress()
+                        || address.isLoopbackAddress()
+                        || address.isLinkLocalAddress()
+                        || address.isSiteLocalAddress()
+                        || address.isMulticastAddress()) {
+                    throw new IllegalActionException("Webhook URL must not resolve to a private network address.");
+                }
+            }
+        } catch (UnknownHostException exception) {
+            throw new IllegalActionException("Webhook URL host could not be resolved.");
         }
     }
 }

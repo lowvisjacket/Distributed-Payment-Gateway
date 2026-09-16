@@ -12,8 +12,6 @@ import com.example.payment_processor.Utility.Exception.IllegalActionException;
 import com.example.payment_processor.Utility.Record.AuthRecord;
 import com.example.payment_processor.Utility.Record.BusinessRecord;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
-import org.apache.coyote.Response;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -22,7 +20,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -30,7 +27,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 
@@ -118,8 +114,13 @@ public class AuthController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, Object>> verifyDeletionCode(@RequestBody @Valid AuthRecord.verifyEmail verifyEmail, @AuthenticationPrincipal UserDetails userDetails) throws IllegalActionException {
         Customer customer = customerService.getCustomerByEmail(userDetails.getUsername());
+        if (!customer.getEmail().equalsIgnoreCase(verifyEmail.email().trim())) {
+            throw new IllegalActionException("Deletion verification email must match the authenticated customer.");
+        }
         if (verificationCodeService.verifyCode(verifyEmail.code(), verifyEmail.email())) {
             customerService.deleteCustomerById(customer.getId());
+        } else {
+            throw new IllegalActionException("Invalid or expired verification code.");
         }
         Map<String, Object> map = new HashMap<>();
         map.put("status", HttpStatus.OK.value());
