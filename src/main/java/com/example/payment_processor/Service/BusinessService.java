@@ -9,6 +9,7 @@ import com.example.payment_processor.Utility.Exception.IllegalActionException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Service
@@ -47,5 +48,26 @@ public class BusinessService {
 
         return businessRepository.findByCustomerId(customerId)
                 .orElseThrow(() -> new IllegalActionException("Business not found for customer id: " + customerId));
+    }
+
+    /**
+     * Refunds from the business owned by the authenticated customer. The caller must pass the
+     * customer ID from the JWT principal, never a client-supplied source business ID.
+     */
+    public Wallet refund(
+            UUID authenticatedCustomerId,
+            UUID recipientCustomerId,
+            UUID recipientBusinessId,
+            BigDecimal amount,
+            String idempotencyKey
+    ) throws IllegalActionException {
+        Business sourceBusiness = getBusinessByCustomerId(authenticatedCustomerId);
+        return walletService.refundFromBusiness(
+                sourceBusiness.getBusinessId(),
+                recipientCustomerId,
+                recipientBusinessId,
+                amount,
+                idempotencyKey
+        );
     }
 }

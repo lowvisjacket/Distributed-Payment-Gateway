@@ -2,6 +2,7 @@ package com.example.payment_processor.REST.auth;
 
 import com.example.payment_processor.Data.Business;
 import com.example.payment_processor.Data.Customer;
+import com.example.payment_processor.Security.AuthenticatedCustomer;
 import com.example.payment_processor.Security.Email.VerificationCodeService;
 import com.example.payment_processor.Security.Jwt.LoginRequest;
 import com.example.payment_processor.Security.Jwt.JwtService;
@@ -11,8 +12,6 @@ import com.example.payment_processor.Utility.Exception.IllegalActionException;
 import com.example.payment_processor.Utility.Record.AuthRecord;
 import com.example.payment_processor.Utility.Record.BusinessRecord;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
-import org.apache.coyote.Response;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -20,13 +19,15 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
+import java.util.HashMap;
 import java.util.Map;
+
 import org.springframework.http.HttpStatus;
 
 @RestController
@@ -64,7 +65,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<Map<String, String>> requestToken(@RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<Map<String, String>> requestToken(@RequestBody LoginRequest loginRequest) throws IllegalActionException {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         loginRequest.getEmail(),
@@ -72,7 +73,8 @@ public class AuthController {
                 )
         );
 
-        String token = jwtService.generateToken(authentication.getName());
+        Customer customer = customerService.getCustomerByEmail(authentication.getName());
+        String token = jwtService.generateToken(customer.getId());
         return ResponseEntity.ok(Map.of("token", token));
     }
 
@@ -86,6 +88,7 @@ public class AuthController {
     }
 
     @PostMapping("/business/register")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<BusinessRecord.Response> createBusiness(@RequestBody Business business, @AuthenticationPrincipal UserDetails userDetails) throws IllegalActionException {
         Customer customer = customerService.getCustomerByEmail(userDetails.getUsername());
         Business createdBusiness = businessService.createBusiness(
@@ -94,5 +97,34 @@ public class AuthController {
                 customer
         );
         return ResponseEntity.ok(BusinessRecord.Response.from(createdBusiness));
+    }
+
+    @PostMapping("/customer/delete")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Map<String, Object>> deleteCustomer(@AuthenticationPrincipal AuthenticatedCustomer userDetails) throws IllegalActionException {
+        Customer customer = customerService.getCustomerById(userDetails.getCustomerId());
+        verificationCodeService.sendRegistrationCode(userDetails.getUsername());
+        Map<String, Object> map = new HashMap<>();
+        map.put("status", HttpStatus.OK.value());
+        map.put("message", "An email was sent to " + customer.getEmail() + " to verify");
+        return ResponseEntity.ok(map);
+    }
+
+    @PostMapping("/customer/delete/verify-email")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Map<String, Object>> verifyDeletionCode(@RequestBody @Valid AuthRecord.verifyEmail verifyEmail, @AuthenticationPrincipal UserDetails userDetails) throws IllegalActionException {
+        Customer customer = customerService.getCustomerByEmail(userDetails.getUsername());
+        if (!customer.getEmail().equalsIgnoreCase(verifyEmail.email().trim())) {
+            throw new IllegalActionException("Deletion verification email must match the authenticated customer.");
+        }
+        if (verificationCodeService.verifyCode(verifyEmail.code(), verifyEmail.email())) {
+            customerService.deleteCustomerById(customer.getId());
+        } else {
+            throw new IllegalActionException("Invalid or expired verification code.");
+        }
+        Map<String, Object> map = new HashMap<>();
+        map.put("status", HttpStatus.OK.value());
+        map.put("message", "User has been deleted successfully");
+        return ResponseEntity.ok(map);
     }
 }

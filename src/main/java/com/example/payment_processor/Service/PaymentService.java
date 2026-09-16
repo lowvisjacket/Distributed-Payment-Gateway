@@ -72,6 +72,12 @@ public class PaymentService {
                 .orElseThrow(() -> new IllegalActionException("Business not found for id: " + businessId));
         Wallet wallet = walletRepository.findByCustomer_IdForUpdate(customerId)
                 .orElseThrow(() -> new IllegalActionException("Customer wallet not found for id: " + customerId));
+        Wallet businessWallet = walletRepository.findByBusinessId(businessId)
+                .orElseThrow(() -> new IllegalActionException("Business wallet not found for id: " + businessId));
+
+        if (!wallet.getCurrency().equals(businessWallet.getCurrency())) {
+            throw new IllegalActionException("Payments require customer and business wallets to use the same currency.");
+        }
 
         if (wallet.getBalance().compareTo(amount) < 0) {
             throw new BalanceException("Insufficient funds to process payment.");
