@@ -3,6 +3,7 @@ package com.example.payment_processor.Service;
 import com.example.payment_processor.Data.Business;
 import com.example.payment_processor.Data.Customer;
 import com.example.payment_processor.Data.Repository.CustomerRepository;
+import com.example.payment_processor.Data.Repository.PaymentRepository;
 import com.example.payment_processor.Data.Repository.WalletRepository;
 import com.example.payment_processor.Data.Repository.WalletIdempotencyRepository;
 import com.example.payment_processor.Data.Wallet;
@@ -10,6 +11,7 @@ import com.example.payment_processor.Data.WalletIdempotency;
 import com.example.payment_processor.Utility.Exception.BalanceException;
 import com.example.payment_processor.Utility.Exception.DisabledWallet;
 import com.example.payment_processor.Utility.Exception.IllegalActionException;
+import com.example.payment_processor.Utility.Enum.PaymentStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,18 +30,36 @@ public class WalletService {
     private final WalletRepository walletRepository;
     private final CustomerRepository customerRepository;
     private final WalletIdempotencyRepository walletIdempotencyRepository;
+    private final PaymentRepository paymentRepository;
 
     public Wallet updateWallet(Currency currency, String email) throws IllegalActionException {
-        Wallet oldWallet = getWalletByEmail(email);
-        return updateWallet(oldWallet, currency);
+        if (email == null || email.isBlank()) {
+            throw new IllegalActionException("Customer email is required.");
+        }
+        Customer customer = customerRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalActionException("Customer not found for email: " + email));
+        return updateWallet(currency, customer.getId());
     }
 
+    @Transactional
     public Wallet updateWallet(Currency currency, UUID customerId) throws IllegalActionException {
-        return updateWallet(getWalletByCustomerId(customerId), currency);
+        validateCustomerId(customerId);
+        Wallet wallet = walletRepository.findByCustomer_IdForUpdate(customerId)
+                .orElseThrow(() -> new IllegalActionException("Wallet not found for customer id: " + customerId));
+        return updateWallet(wallet, currency, customerId);
     }
 
-    private Wallet updateWallet(Wallet oldWallet, Currency currency) throws IllegalActionException {
+    private Wallet updateWallet(Wallet oldWallet, Currency currency, UUID customerId) throws IllegalActionException {
         validateCurrency(String.valueOf(currency));
+        if (oldWallet.getCurrency().equals(currency)) {
+            return oldWallet;
+        }
+        if (oldWallet.getBalance().compareTo(BigDecimal.ZERO) != 0) {
+            throw new IllegalActionException("Wallet currency cannot be changed while its balance is non-zero.");
+        }
+        if (paymentRepository.existsByCustomerIdAndPaymentStatus(customerId, PaymentStatus.PENDING)) {
+            throw new IllegalActionException("Wallet currency cannot be changed while payments are pending.");
+        }
         oldWallet.setCurrency(currency);
         walletRepository.save(oldWallet);
         return oldWallet;
@@ -97,31 +117,6 @@ public class WalletService {
                 .orElseThrow(() -> new IllegalActionException("Customer not found for email: " + email));
         isWalletDisabled(customer.getId());
         return getWalletByCustomerId(customer.getId());
-    }
-
-    @Transactional
-    public Wallet deposit(UUID customerId, BigDecimal amount, String idempotencyKey)
-            throws IllegalActionException {
-        isWalletDisabled(customerId);
-        validateCustomerId(customerId);
-        validateAmount(amount);
-        WalletIdempotency idempotency = startOperation(
-                idempotencyKey,
-                "DEPOSIT",
-                customerId + "|" + amount.stripTrailingZeros().toPlainString()
-        );
-        Wallet completedWallet = getCompletedWallet(idempotency);
-        if (completedWallet != null) {
-            return completedWallet;
-        }
-
-        Wallet wallet = walletRepository.findByCustomer_IdForUpdate(customerId)
-                .orElseThrow(() -> new IllegalActionException("Wallet not found for customer id: " + customerId));
-        wallet.setBalance(wallet.getBalance().add(amount));
-        wallet.setUpdatedAt(Instant.now());
-        Wallet savedWallet = walletRepository.save(wallet);
-        completeOperation(idempotency, savedWallet.getId());
-        return savedWallet;
     }
 
     @Transactional
@@ -204,6 +199,77 @@ public class WalletService {
         sourceWallet.setUpdatedAt(Instant.now());
         targetWallet.setUpdatedAt(Instant.now());
 
+        walletRepository.save(sourceWallet);
+        walletRepository.save(targetWallet);
+        completeOperation(idempotency, sourceWallet.getId());
+        return sourceWallet;
+    }
+
+    @Transactional
+    public Wallet refundFromBusiness(
+            UUID sourceBusinessId,
+            UUID recipientCustomerId,
+            UUID recipientBusinessId,
+            BigDecimal amount,
+            String idempotencyKey
+    ) throws IllegalActionException {
+        validateAmount(amount);
+        if (sourceBusinessId == null) {
+            throw new IllegalActionException("Source business id is required.");
+        }
+        if ((recipientCustomerId == null) == (recipientBusinessId == null)) {
+            throw new IllegalActionException("Provide exactly one refund recipient: a customer or a business.");
+        }
+
+        String operation = recipientCustomerId != null
+                ? "BUSINESS_REFUND_TO_CUSTOMER"
+                : "BUSINESS_REFUND_TO_BUSINESS";
+        UUID recipientId = recipientCustomerId != null ? recipientCustomerId : recipientBusinessId;
+        WalletIdempotency idempotency = startOperation(
+                idempotencyKey,
+                operation,
+                sourceBusinessId + "|" + recipientId + "|" + amount.stripTrailingZeros().toPlainString()
+        );
+        Wallet completedWallet = getCompletedWallet(idempotency);
+        if (completedWallet != null) {
+            return completedWallet;
+        }
+
+        Wallet source = walletRepository.findByBusinessId(sourceBusinessId)
+                .orElseThrow(() -> new IllegalActionException("Business wallet not found for id: " + sourceBusinessId));
+        Wallet target = recipientCustomerId != null
+                ? getWalletByCustomerId(recipientCustomerId)
+                : walletRepository.findByBusinessId(recipientBusinessId)
+                        .orElseThrow(() -> new IllegalActionException(
+                                "Recipient business wallet not found for id: " + recipientBusinessId
+                        ));
+        if (source.getId().equals(target.getId())) {
+            throw new IllegalActionException("Cannot refund to the same wallet.");
+        }
+
+        UUID firstWalletId = source.getId().compareTo(target.getId()) < 0 ? source.getId() : target.getId();
+        UUID secondWalletId = source.getId().compareTo(target.getId()) < 0 ? target.getId() : source.getId();
+        Wallet firstWallet = walletRepository.findByIdForUpdate(firstWalletId)
+                .orElseThrow(() -> new IllegalActionException("Source or recipient wallet no longer exists."));
+        Wallet secondWallet = walletRepository.findByIdForUpdate(secondWalletId)
+                .orElseThrow(() -> new IllegalActionException("Source or recipient wallet no longer exists."));
+        Wallet sourceWallet = firstWallet.getId().equals(source.getId()) ? firstWallet : secondWallet;
+        Wallet targetWallet = firstWallet.getId().equals(target.getId()) ? firstWallet : secondWallet;
+
+        if (sourceWallet.isDisabled() || targetWallet.isDisabled()) {
+            throw new DisabledWallet("A wallet associated with this refund has been disabled.");
+        }
+        if (!sourceWallet.getCurrency().equals(targetWallet.getCurrency())) {
+            throw new IllegalActionException("Refunds require wallets with the same currency.");
+        }
+        if (sourceWallet.getBalance().compareTo(amount) < 0) {
+            throw new BalanceException("Insufficient funds for refund.");
+        }
+
+        sourceWallet.setBalance(sourceWallet.getBalance().subtract(amount));
+        targetWallet.setBalance(targetWallet.getBalance().add(amount));
+        sourceWallet.setUpdatedAt(Instant.now());
+        targetWallet.setUpdatedAt(Instant.now());
         walletRepository.save(sourceWallet);
         walletRepository.save(targetWallet);
         completeOperation(idempotency, sourceWallet.getId());

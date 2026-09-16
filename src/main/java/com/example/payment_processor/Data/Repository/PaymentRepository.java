@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
     List<Payment> findByPaymentStatus(PaymentStatus paymentStatus);
@@ -20,4 +21,6 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Payment p where p.id = :paymentId")
     Optional<Payment> findByIdForUpdate(@Param("paymentId") Long paymentId);
+
+    boolean existsByCustomerIdAndPaymentStatus(UUID customerId, PaymentStatus paymentStatus);
 }
