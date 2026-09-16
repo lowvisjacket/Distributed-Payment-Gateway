@@ -13,6 +13,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -41,10 +42,10 @@ public class CustomerService implements UserDetailsService {
                 .roles(customer.getCustomerRole().name())
                 .disabled(!customer.isAccountStatus())
                 .build();
-        return new AuthenticatedCustomer(customer.getId(), userDetails);
+        return new AuthenticatedCustomer(customer.getId(), userDetails, verificationCodeService);
     }
 
-    public Customer createCustomer(String firstName, String lastName, String email, String phoneNumber, String password) throws IllegalActionException {
+    public void createCustomer(String firstName, String lastName, String email, String phoneNumber, String password) throws IllegalActionException {
         if (firstName == null || firstName.isBlank()) {
             throw new IllegalActionException("Customer first name is required.");
         }
@@ -73,7 +74,7 @@ public class CustomerService implements UserDetailsService {
 
         Customer customer = new Customer(firstName.trim(), lastName.trim(), normalizedEmail, normalizedPhoneNumber, bCryptPasswordEncoder.encode(password));
         verificationCodeService.sendRegistrationCode(customer.getEmail());
-        return customerRepository.save(customer);
+        customerRepository.save(customer);
     }
 
     public Customer getCustomerById(UUID customerId) throws IllegalActionException {
@@ -97,5 +98,16 @@ public class CustomerService implements UserDetailsService {
         Customer customer = getCustomerByEmail(email);
         customer.setAccountStatus(true);
         customerRepository.save(customer);
+    }
+
+    public void deleteCustomerById(UUID customerId) throws IllegalActionException {
+        if (customerId == null) {
+            throw new IllegalActionException("Customer id is required.");
+        }
+        Optional<Customer> customer = customerRepository.findById(customerId);
+        if (customer.isEmpty()) {
+            throw new IllegalActionException("Customer not found for id: " + customerId);
+        }
+        customerRepository.delete(customer.get());
     }
 }

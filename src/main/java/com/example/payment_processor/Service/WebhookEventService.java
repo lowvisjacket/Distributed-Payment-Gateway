@@ -5,9 +5,10 @@ import com.example.payment_processor.Data.Repository.WebhookEventRepository;
 import com.example.payment_processor.Data.Repository.WebhookSubscriptionRepository;
 import com.example.payment_processor.Data.WebhookEvent;
 import com.example.payment_processor.Data.WebhookSubscription;
+import com.example.payment_processor.Utility.Exception.IllegalActionException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,12 +23,19 @@ import java.util.HexFormat;
 import java.util.Map;
 
 @Service
-@RequiredArgsConstructor
+
 public class WebhookEventService {
     private final WebhookEventRepository eventRepository;
     private final WebhookSubscriptionRepository subscriptionRepository;
     private final ObjectMapper objectMapper;
     private final RestClient restClient = RestClient.create();
+
+    @Autowired
+    public WebhookEventService(WebhookEventRepository eventRepository, WebhookSubscriptionRepository subscriptionRepository, ObjectMapper objectMapper) {
+        this.eventRepository = eventRepository;
+        this.subscriptionRepository = subscriptionRepository;
+        this.objectMapper = objectMapper;
+    }
 
     @Transactional
     public void recordPaymentEvent(Payment payment, String eventType) {
@@ -60,6 +68,7 @@ public class WebhookEventService {
         }
 
         try {
+            WebhookSubscriptionService.validateUrl(subscription.getUrl());
             String payload = objectMapper.writeValueAsString(Map.of(
                     "event", event.getEventType(),
                     "paymentId", event.getPaymentId(),
@@ -77,7 +86,7 @@ public class WebhookEventService {
                     .toBodilessEntity();
 
             event.markDelivered(now);
-        } catch (JsonProcessingException | RestClientException exception) {
+        } catch (JsonProcessingException | RestClientException | IllegalActionException exception) {
             event.markRetry(
                     now.plusSeconds(retryDelaySeconds(event.getAttempts())),
                     exception.getMessage()

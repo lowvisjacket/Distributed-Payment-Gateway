@@ -8,6 +8,8 @@ import com.example.payment_processor.Service.PaymentService;
 import com.example.payment_processor.Service.WalletService;
 import com.example.payment_processor.Utility.Exception.IllegalActionException;
 import com.example.payment_processor.Utility.Record.CustomerRecord;
+import com.example.payment_processor.Utility.Record.PaymentRecord;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -38,12 +40,12 @@ public class CustomerController {
     public ResponseEntity<Payment> payBusiness(
             @AuthenticationPrincipal AuthenticatedCustomer customer,
             @RequestHeader("Idempotency-Key") String idempotencyKey,
-            @RequestBody Payment payment
+            @RequestBody @Valid PaymentRecord.CreateRequest payment
     ) throws IllegalActionException {
         return ResponseEntity.ok(paymentService.createPayment(
                 customer.getCustomerId(),
-                payment.getBusinessId(),
-                payment.getAmount(),
+                payment.businessId(),
+                payment.amount(),
                 idempotencyKey
         ));
     }

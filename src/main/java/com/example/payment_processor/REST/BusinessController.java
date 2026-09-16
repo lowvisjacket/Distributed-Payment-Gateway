@@ -15,11 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/business")
@@ -57,8 +53,8 @@ public class BusinessController {
     }
 
     @GetMapping("/")
-    public ResponseEntity<BusinessRecord.Response> getBusiness(@AuthenticationPrincipal AuthenticatedCustomer userDetails) throws IllegalActionException {
-        Customer customer = customerService.getCustomerById(userDetails.getCustomerId());
+    public ResponseEntity<BusinessRecord.Response> getBusiness(@AuthenticationPrincipal AuthenticatedCustomer user) throws IllegalActionException {
+        Customer customer = customerService.getCustomerById(user.getCustomerId());
         Business business = customer.getBusiness();
         if (business == null) {
             throw new IllegalActionException("Business not found for customer.");
@@ -67,7 +63,22 @@ public class BusinessController {
     }
 
     @GetMapping("/wallet")
-    public ResponseEntity<Wallet> getWallet(@AuthenticationPrincipal AuthenticatedCustomer userDetails) throws IllegalActionException {
-        return ResponseEntity.ok(businessService.getBusinessByCustomerId(userDetails.getCustomerId()).getWallet());
+    public ResponseEntity<Wallet> getWallet(@AuthenticationPrincipal AuthenticatedCustomer customer) throws IllegalActionException {
+        return ResponseEntity.ok(businessService.getBusinessByCustomerId(customer.getCustomerId()).getWallet());
+    }
+
+    @PostMapping("/refund")
+    public ResponseEntity<Wallet> refund(
+            @AuthenticationPrincipal AuthenticatedCustomer customer,
+            @RequestBody @Valid BusinessRecord.RefundFundsRequest request,
+            @RequestHeader("Idempotency-Key") String idempotencyKey
+            ) throws IllegalActionException {
+        return ResponseEntity.ok(
+                businessService.refund(customer.getCustomerId(),
+                        request.recipientCustomerId(),
+                        request.recipientBusinessId(),
+                        request.amount(), idempotencyKey
+                )
+        );
     }
 }

@@ -1,11 +1,11 @@
 package com.example.payment_processor.Utility.Record;
 
-import com.example.payment_processor.Data.Business;
 import com.example.payment_processor.Data.Customer;
-import com.example.payment_processor.Data.Wallet;
 import com.example.payment_processor.Utility.Enum.CustomerRole;
+import com.example.payment_processor.Utility.Enum.DepositStatus;
 
-import java.util.Currency;
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.UUID;
 
 public class CustomerRecord {
@@ -47,6 +47,25 @@ public class CustomerRecord {
                     customer.getCustomerRole(),
                     customer.getWallet().getId()
             );
+        }
+    }
+
+    public static record ManualApprovalDeposit(
+            UUID id,
+            String idempotencyKey,
+            UUID customerId,
+            BigDecimal amount,
+            Instant createdAt,
+            DepositStatus status
+    ) {
+        public ManualApprovalDeposit(
+                UUID id,
+                String idempotencyKey,
+                UUID customerId,
+                BigDecimal amount,
+                Instant createdAt
+        ) {
+            this(id, idempotencyKey, customerId, amount, createdAt, DepositStatus.PENDING_MANUAL_REVIEW);
         }
     }
 }
