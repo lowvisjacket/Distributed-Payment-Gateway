@@ -1,6 +1,7 @@
 package com.example.payment_processor.Security.Jwt;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -13,9 +14,12 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 @Component
 public class JwtService {
+    private final Map<String, Date> revokedTokens = new ConcurrentHashMap<>();
+
     @Value("${jwt.secret}")
     private String SECRET;
     public String generateToken(UUID customerId) {
@@ -68,6 +72,30 @@ public class JwtService {
         final UUID tokenCustomerId = extractCustomerId(token);
         return (userDetails.isEnabled()
                 && tokenCustomerId.equals(customerId)
-                && !isTokenExpired(token));
+                && !isTokenExpired(token)
+                && !isTokenRevoked(token));
+    }
+
+    public void revokeToken(String token) {
+        if (token == null || token.isBlank()) {
+            return;
+        }
+
+        try {
+            revokedTokens.put(token, extractExpiration(token));
+            removeExpiredRevokedTokens();
+        } catch (JwtException | IllegalArgumentException ignored) {
+            // Logout must still clear the client cookie when the presented token is invalid.
+        }
+    }
+
+    public boolean isTokenRevoked(String token) {
+        removeExpiredRevokedTokens();
+        return revokedTokens.containsKey(token);
+    }
+
+    private void removeExpiredRevokedTokens() {
+        Date now = new Date();
+        revokedTokens.entrySet().removeIf(entry -> entry.getValue().before(now));
     }
 }

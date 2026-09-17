@@ -11,8 +11,10 @@ import com.example.payment_processor.Service.CustomerService;
 import com.example.payment_processor.Utility.Exception.IllegalActionException;
 import com.example.payment_processor.Utility.Record.AuthRecord;
 import com.example.payment_processor.Utility.Record.BusinessRecord;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -78,6 +80,12 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("token", token));
     }
 
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(HttpServletRequest request) {
+        jwtService.revokeToken(extractToken(request));
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/customer/register")
     public ResponseEntity<Map<String, Object>> createCustomer(@RequestBody Customer customer) throws IllegalActionException {
         customerService.createCustomer(customer.getFirstName(), customer.getLastName(), customer.getEmail(), customer.getPhoneNumber(), customer.getPassword());
@@ -112,19 +120,30 @@ public class AuthController {
 
     @PostMapping("/customer/delete/verify-email")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Map<String, Object>> verifyDeletionCode(@RequestBody @Valid AuthRecord.verifyEmail verifyEmail, @AuthenticationPrincipal UserDetails userDetails) throws IllegalActionException {
+    public ResponseEntity<Map<String, Object>> verifyDeletionCode(@RequestBody @Valid AuthRecord.verifyEmail verifyEmail, @AuthenticationPrincipal UserDetails userDetails, HttpServletRequest request) throws IllegalActionException {
         Customer customer = customerService.getCustomerByEmail(userDetails.getUsername());
         if (!customer.getEmail().equalsIgnoreCase(verifyEmail.email().trim())) {
             throw new IllegalActionException("Deletion verification email must match the authenticated customer.");
         }
         if (verificationCodeService.verifyCode(verifyEmail.code(), verifyEmail.email())) {
             customerService.deleteCustomerById(customer.getId());
+            jwtService.revokeToken(extractToken(request));
         } else {
             throw new IllegalActionException("Invalid or expired verification code.");
         }
         Map<String, Object> map = new HashMap<>();
         map.put("status", HttpStatus.OK.value());
         map.put("message", "User has been deleted successfully");
-        return ResponseEntity.ok(map);
+        return ResponseEntity
+                .ok()
+                .body(map);
+    }
+
+    private String extractToken(HttpServletRequest request) {
+        String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
+        }
+        return null;
     }
 }
