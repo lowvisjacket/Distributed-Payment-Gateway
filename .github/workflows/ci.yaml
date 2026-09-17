@@ -15,6 +15,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Set up JDK 21
         uses: actions/setup-java@v5
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          DATASOURCE_URL: ${{ secrets.DATASOURCE_URL }}
+          DATASOURCE_USERNAME: ${{ secrets.DATASOURCE_USERNAME }}
+          DATASOURCE_PASSWORD: ${{ secrets.DATASOURCE_PASSWORD }}
         with:
           java-version: '21'
           distribution: 'temurin'
