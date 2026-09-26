@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
 @AutoConfigureMockMvc
-@SpringBootTest
+@SpringBootTest(properties = "spring.jpa.hibernate.ddl-auto=create-drop")
 @Import(TestcontainersConfiguration.class)
 public class WalletTests {
 

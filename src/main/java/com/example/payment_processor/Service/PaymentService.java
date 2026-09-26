@@ -86,7 +86,7 @@ public class PaymentService {
         wallet.setBalance(wallet.getBalance().subtract(amount));
         wallet.setUpdatedAt(Instant.now());
 
-        Payment payment = new Payment(customerId, businessId, amount, Instant.now(), Instant.now());
+        Payment payment = new Payment(customer, business, amount, Instant.now(), Instant.now());
 
         walletRepository.save(wallet);
         Payment savedPayment = paymentRepository.saveAndFlush(payment);
