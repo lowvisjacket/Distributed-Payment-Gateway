@@ -22,5 +22,9 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     @Query("select p from Payment p where p.id = :paymentId")
     Optional<Payment> findByIdForUpdate(@Param("paymentId") Long paymentId);
 
-    boolean existsByCustomerIdAndPaymentStatus(UUID customerId, PaymentStatus paymentStatus);
+    boolean existsByCustomer_IdAndPaymentStatus(UUID customerId, PaymentStatus paymentStatus);
+
+    default boolean existsByCustomerIdAndPaymentStatus(UUID customerId, PaymentStatus paymentStatus) {
+        return existsByCustomer_IdAndPaymentStatus(customerId, paymentStatus);
+    }
 }

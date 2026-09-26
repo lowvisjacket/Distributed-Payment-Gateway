@@ -6,13 +6,15 @@ import com.example.payment_processor.Security.Email.Email;
 import com.example.payment_processor.Security.Email.EmailService;
 import com.example.payment_processor.Security.Email.VerificationCode;
 import com.example.payment_processor.Security.Email.VerificationCodeRepository;
+import com.example.payment_processor.Security.Jwt.JwtService;
 import com.example.payment_processor.Utility.Exception.EmailException;
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.http.MediaType;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -30,7 +32,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties = "spring.jpa.hibernate.ddl-auto=create-drop")
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
 class CustomerAccountTests {
@@ -43,6 +45,9 @@ class CustomerAccountTests {
 
     @Autowired
     VerificationCodeRepository verificationCodeRepository;
+
+    @Autowired
+    JwtService jwtService;
 
     @MockitoBean
     EmailService emailService;
@@ -106,6 +111,44 @@ class CustomerAccountTests {
     }
 
     @Test
+    void logoutRevokesBearerJwt() throws Exception {
+        String email = registerAndVerifyCustomer();
+        String token = loginToken(email);
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+
+        assertTrue(jwtService.isTokenRevoked(token));
+    }
+
+    @Test
+    void successfulDeletionRevokesBearerJwt() throws Exception {
+        String email = registerAndVerifyCustomer();
+        String token = loginToken(email);
+
+        mockMvc.perform(post("/api/auth/customer/delete")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+
+        VerificationCode deletionCode = verificationCodeRepository.findByEmail(email);
+        assertNotNull(deletionCode);
+
+        mockMvc.perform(post("/api/auth/customer/delete/verify-email")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "%s",
+                                  "code": "%s"
+                                }
+                                """.formatted(email, deletionCode.getCode())))
+                .andExpect(status().isOk());
+
+        assertTrue(jwtService.isTokenRevoked(token));
+    }
+
+    @Test
     void invalidVerificationCodeDoesNotUnlockCustomer() throws Exception {
         String email = uniqueEmail();
         register(email);
@@ -148,6 +191,32 @@ class CustomerAccountTests {
         mockMvc.perform(registerRequest(email))
                 .andExpect(status().isCreated());
         reset(emailService);
+    }
+
+    private String registerAndVerifyCustomer() throws Exception {
+        String email = uniqueEmail();
+        register(email);
+        VerificationCode verificationCode = verificationCodeRepository.findByEmail(email);
+
+        mockMvc.perform(post("/api/auth/verify-email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "%s",
+                                  "code": "%s"
+                                }
+                                """.formatted(email, verificationCode.getCode())))
+                .andExpect(status().isOk());
+        return email;
+    }
+
+    private String loginToken(String email) throws Exception {
+        String response = mockMvc.perform(loginRequest(email))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        return JsonPath.read(response, "$.token");
     }
 
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder registerRequest(String email) {
