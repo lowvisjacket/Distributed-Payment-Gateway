@@ -6,14 +6,13 @@ on:
     branches:
       - "**"
   pull_request:
-
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
-      - name: Set up JDK 21
+      - name: Set up JDK 21 runtime
         uses: actions/setup-java@v5
         with:
           java-version: '21'
