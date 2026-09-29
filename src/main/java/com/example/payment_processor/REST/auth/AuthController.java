@@ -97,7 +97,7 @@ public class AuthController {
 
     @PostMapping("/business/register")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<BusinessRecord.Response> createBusiness(@RequestBody Business business, @AuthenticationPrincipal UserDetails userDetails) throws IllegalActionException {
+    public ResponseEntity<BusinessRecord.Response> createBusiness(@RequestBody Business business, @AuthenticationPrincipal AuthenticatedCustomer userDetails) throws IllegalActionException {
         Customer customer = customerService.getCustomerByEmail(userDetails.getUsername());
         Business createdBusiness = businessService.createBusiness(
                 business.getName(),
