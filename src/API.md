@@ -1,4 +1,6 @@
-# Payment Processor API guide
+# Distributed Payment Gateway API guide
+
+Every `/api/**` endpoint is also available through the Spring Cloud Gateway MVC entry path `/gateway/api/**` (for example, `POST /gateway/api/auth/login`). The direct `/api/**` paths remain available.
 
 All JSON endpoints return normal Spring HTTP status codes. Protected routes require `Authorization: Bearer <JWT>`. Any operation that changes a balance requires an `Idempotency-Key` header; reuse the same key only for an identical retry.
 
