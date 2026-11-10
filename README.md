@@ -1,5 +1,7 @@
 # Distributed Payment Gateway
 
+[![CI](https://github.com/lowvisjacket/Distributed-Payment-Gateway/actions/workflows/ci.yaml/badge.svg)](https://github.com/lowvisjacket/Distributed-Payment-Gateway/actions/workflows/ci.yaml) ![Java 21](https://img.shields.io/badge/Java-21-blue) ![License: MIT](https://img.shields.io/badge/License-MIT-green)
+
 A Spring Boot REST API for customer and business accounts with internal wallets, idempotent transfers, scheduled payment settlement, and signed webhooks. Payments move funds between wallet records in this application; this project does not connect to a card network, bank, or external payment provider.
 
 ## Features
@@ -12,6 +14,14 @@ A Spring Boot REST API for customer and business accounts with internal wallets,
 - Scheduled payment settlement and admin-initiated deposits.
 - Signed payment webhooks using HMAC-SHA256, with retries for failed deliveries.
 - Currency changes when a wallet has no balance or pending payments.
+
+## Engineering highlights
+
+- **Exactly-once money movement.** Every balance change requires an `Idempotency-Key`. The key is stored with a SHA-256 fingerprint of the request, so a retry returns the original result and a reused key with different data is rejected.
+- **Deadlock-free transfers.** Both wallets are locked with `SELECT … FOR UPDATE` in a deterministic order (by wallet id) before balances change.
+- **Reliable webhooks.** Payment events are written to an outbox table in the same transaction, then delivered by a scheduler with exponential backoff (30 s doubling to a 1 h cap) and an HMAC-SHA256 `X-Payment-Signature` header.
+- **SSRF protection.** Webhook URLs must be HTTPS and must not resolve to loopback, link-local, or private addresses — checked at registration and again at delivery.
+- **Tested.** 52 JUnit tests run against in-memory H2 in CI on every push.
 
 ## Technology
 
